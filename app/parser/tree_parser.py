@@ -363,7 +363,7 @@ def parse_markdown(text: str) -> tuple[TreeNode, list[Irregularity]]:
     for section in sorted(numbered_sections, key=lambda item: path_sort_key(item.path or "")):
         assert section.path is not None
         node = TreeNode(
-            heading=section.heading_text,
+            heading=section.title,
             level=section.level,
             path=section.path,
             logical_id=section.path,
