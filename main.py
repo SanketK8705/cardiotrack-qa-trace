@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from app.api.browse import router as browse_router
+from app.api.generations import router as generations_router
 from app.api.ingest import router as ingest_router
 from app.api.selections import router as selections_router
 from app.database import Base, engine
@@ -14,6 +15,7 @@ Base.metadata.create_all(bind=engine)
 app.include_router(ingest_router)
 app.include_router(browse_router)
 app.include_router(selections_router)
+app.include_router(generations_router)
 
 
 @app.get("/health")
