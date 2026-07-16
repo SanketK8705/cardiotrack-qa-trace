@@ -41,3 +41,4 @@ ENV/
 .pytest_cache/
 .coverage
 htmlcov/
+data/generations.json

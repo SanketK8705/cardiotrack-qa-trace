@@ -1,0 +1,682 @@
+
+### GET /health
+HTTP 200
+{
+    "status": "ok"
+}
+
+### POST /documents/ingest
+HTTP 201
+{
+    "document": {
+        "id": 2,
+        "name": "CT-200 Manual",
+        "created_at": "2026-07-16T16:37:16.048957"
+    },
+    "version": {
+        "id": 3,
+        "document_id": 2,
+        "version_number": 1,
+        "ingested_at": "2026-07-16T16:37:16.049685",
+        "source_filename": "ct200_manual.md"
+    },
+    "node_count": 28,
+    "root_node_id": 58,
+    "irregularities": [
+        {
+            "kind": "unnumbered_document_title",
+            "description": "Document title 'CardioTrack CT-200 Home Blood Pressure Monitor \u2014 Technical & User Manual' has no numeric prefix.",
+            "handling": "Used as the synthetic root node heading; not a numbered section.",
+            "location": "# CardioTrack CT-200 Home Blood Pressure Monitor \u2014 Technical & User Manual"
+        },
+        {
+            "kind": "orphan_preamble_content",
+            "description": "Content appears before the first numbered heading ('<!-- TODO: confirm with regulatory -->').",
+            "handling": "Attached to the synthetic root node body and logged.",
+            "location": "before first numbered section"
+        },
+        {
+            "kind": "html_comment_in_preamble",
+            "description": "HTML comment found in pre-heading content.",
+            "handling": "Preserved verbatim in root node body.",
+            "location": "<!-- TODO: confirm with regulatory -->"
+        },
+        {
+            "kind": "markdown_depth_mismatch",
+            "description": "Heading 2.1.1.1 uses 4 markdown # markers but numeric prefix implies level 4 (expected 5 # markers).",
+            "handling": "Node level and parent assignment use numeric prefix depth only.",
+            "location": "#### 2.1.1.1 Battery Life Under Typical Use"
+        },
+        {
+            "kind": "markdown_depth_mismatch",
+            "description": "Heading 3.2 uses 4 markdown # markers but numeric prefix implies level 2 (expected 3 # markers).",
+            "handling": "Node level and parent assignment use numeric prefix depth only.",
+            "location": "#### 3.2 Cuff Inflation Sequence"
+        },
+        {
+            "kind": "file_order_mismatch",
+            "description": "Section 3.3 (Result Display and Classification) appears in the file after 3.4 but numeric order says it should come before.",
+            "handling": "Sibling order is determined by numeric path sorting, not file order.",
+            "location": "### 3.3 Result Display and Classification"
+        },
+        {
+            "kind": "duplicate_heading_title",
+            "description": "Heading title 'Error Codes' appears at multiple paths: 4.2, 7.1.",
+            "handling": "Each path produces a distinct node with its own logical_id, parent, and body.",
+            "location": null
+        },
+        {
+            "kind": "markdown_table_in_body",
+            "description": "Section 2.1 contains a markdown table (9 row(s)).",
+            "handling": "Table lines are kept in section body; only markdown # lines are treated as headings.",
+            "location": "### 2.1 General Specifications"
+        },
+        {
+            "kind": "ordered_list_in_body",
+            "description": "Section 3.3 contains an ordered list (5 item(s)) that could be mistaken for numbered headings.",
+            "handling": "List items stay in body because they lack a leading # marker.",
+            "location": "### 3.3 Result Display and Classification"
+        },
+        {
+            "kind": "markdown_table_in_body",
+            "description": "Section 4.2 contains a markdown table (7 row(s)).",
+            "handling": "Table lines are kept in section body; only markdown # lines are treated as headings.",
+            "location": "### 4.2 Error Codes"
+        },
+        {
+            "kind": "missing_intermediate_parent",
+            "description": "Section 2.1.1.1 implies parent 2.1.1, but that heading does not exist.",
+            "handling": "Attached to nearest existing ancestor at path 2.1.",
+            "location": "#### 2.1.1.1 Battery Life Under Typical Use"
+        }
+    ],
+    "changes": null
+}
+
+### v1 node IDs selected from SQLite
+document_id=2
+4.2 node_id=73
+3.2 node_id=68
+
+### POST /selections
+HTTP 201
+{
+    "id": 2,
+    "name": "v1 alarm and inflation checks",
+    "created_at": "2026-07-16T16:37:16.134193",
+    "nodes": [
+        {
+            "id": 73,
+            "logical_id": "4.2",
+            "heading": "Error Codes",
+            "version_id": 3,
+            "body": "| Code | Meaning | Device Behavior |\n|---|---|---|\n| E1 | Cuff not connected or leak detected | Aborts measurement, displays E1 |\n| E2 | Motion artifact detected during measurement | Aborts measurement, displays E2, prompts retry |\n| E3 | Overpressure condition | Auto-deflates within 2 seconds, displays E3 |\n| E4 | Low battery during measurement | Aborts measurement, displays E4 |\n| E5 | Internal sensor fault | Device disables measurement function, displays E5 until serviced |"
+        },
+        {
+            "id": 68,
+            "logical_id": "3.2",
+            "heading": "Cuff Inflation Sequence",
+            "version_id": 3,
+            "body": "On starting a measurement, the device inflates the cuff to an initial target of 180 mmHg. If the user's pulse is not detected by 180 mmHg, the device inflates in 40 mmHg increments up to a maximum of 299 mmHg before aborting with an error. Deflation occurs in controlled steps of approximately 3 mmHg to capture oscillometric pulse data."
+        }
+    ]
+}
+
+### POST /selections/2/generate
+HTTP 200
+{
+    "generation_id": "8c7e20a2-d7c6-4bb7-9ead-01cc133343ce",
+    "selection_id": 2,
+    "node_snapshot": [
+        {
+            "node_id": 73,
+            "logical_id": "4.2",
+            "content_hash": "864da8ae48c595a4723efe308e57624220d1a32ada1b4edeafa140a983377e65"
+        },
+        {
+            "node_id": 68,
+            "logical_id": "3.2",
+            "content_hash": "a1f73152526532cf4692d15ffc9516518dceea83d6ae73a8ed153ea6e946fa1f"
+        }
+    ],
+    "prompt_used": "You are a QA analyst creating concise test case ideas from selected medical-device manual sections.\n\nGenerate 3 to 5 QA test case ideas that verify the behavior, limits, and user-visible outcomes described in the selected sections.\n\nReturn ONLY valid JSON. Do not include markdown fences. Do not include prose before or after the JSON.\n\nThe JSON must have exactly this shape:\n{\n  \"test_cases\": [\n    {\n      \"title\": \"short descriptive title\",\n      \"steps\": [\"step 1\", \"step 2\"],\n      \"expected_result\": \"observable expected result\"\n    }\n  ]\n}\n\nRules:\n- Produce between 3 and 5 test cases.\n- Each title must be non-empty.\n- Each test case must have at least one step.\n- Each expected_result must be non-empty.\n- Base every test case only on the selected source sections below.\n\nSelected source sections:\nLogical ID: 4.2\nHeading: Error Codes\nBody:\n| Code | Meaning | Device Behavior |\n|---|---|---|\n| E1 | Cuff not connected or leak detected | Aborts measurement, displays E1 |\n| E2 | Motion artifact detected during measurement | Aborts measurement, displays E2, prompts retry |\n| E3 | Overpressure condition | Auto-deflates within 2 seconds, displays E3 |\n| E4 | Low battery during measurement | Aborts measurement, displays E4 |\n| E5 | Internal sensor fault | Device disables measurement function, displays E5 until serviced |\n\n---\n\nLogical ID: 3.2\nHeading: Cuff Inflation Sequence\nBody:\nOn starting a measurement, the device inflates the cuff to an initial target of 180 mmHg. If the user's pulse is not detected by 180 mmHg, the device inflates in 40 mmHg increments up to a maximum of 299 mmHg before aborting with an error. Deflation occurs in controlled steps of approximately 3 mmHg to capture oscillometric pulse data.\n",
+    "raw_llm_response": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Cuff Not Connected Error\",\n      \"steps\": [\"Start a measurement with the cuff not connected\", \"Observe the device's display\"],\n      \"expected_result\": \"The device displays error code E1 and aborts the measurement\"\n    },\n    {\n      \"title\": \"Motion Artifact Detection\",\n      \"steps\": [\"Start a measurement\", \"Introduce motion during the measurement\", \"Observe the device's display\"],\n      \"expected_result\": \"The device displays error code E2, aborts the measurement, and prompts the user to retry\"\n    },\n    {\n      \"title\": \"Cuff Inflation Sequence\",\n      \"steps\": [\"Start a measurement with the cuff connected\", \"Monitor the cuff pressure\"],\n      \"expected_result\": \"The device inflates the cuff to 180 mmHg, then in 40 mmHg increments up to 299 mmHg if the user's pulse is not detected, before aborting with an error\"\n    },\n    {\n      \"title\": \"Overpressure Condition\",\n      \"steps\": [\"Start a measurement\", \"Simulate an overpressure condition\"],\n      \"expected_result\": \"The device auto-deflates within 2 seconds and displays error code E3\"\n    },\n    {\n      \"title\": \"Low Battery During Measurement\",\n      \"steps\": [\"Start a measurement with low battery\", \"Observe the device's display\"],\n      \"expected_result\": \"The device aborts the measurement and displays error code E4\"\n    }\n  ]\n}",
+    "parsed_test_cases": [
+        {
+            "title": "Cuff Not Connected Error",
+            "steps": [
+                "Start a measurement with the cuff not connected",
+                "Observe the device's display"
+            ],
+            "expected_result": "The device displays error code E1 and aborts the measurement"
+        },
+        {
+            "title": "Motion Artifact Detection",
+            "steps": [
+                "Start a measurement",
+                "Introduce motion during the measurement",
+                "Observe the device's display"
+            ],
+            "expected_result": "The device displays error code E2, aborts the measurement, and prompts the user to retry"
+        },
+        {
+            "title": "Cuff Inflation Sequence",
+            "steps": [
+                "Start a measurement with the cuff connected",
+                "Monitor the cuff pressure"
+            ],
+            "expected_result": "The device inflates the cuff to 180 mmHg, then in 40 mmHg increments up to 299 mmHg if the user's pulse is not detected, before aborting with an error"
+        },
+        {
+            "title": "Overpressure Condition",
+            "steps": [
+                "Start a measurement",
+                "Simulate an overpressure condition"
+            ],
+            "expected_result": "The device auto-deflates within 2 seconds and displays error code E3"
+        },
+        {
+            "title": "Low Battery During Measurement",
+            "steps": [
+                "Start a measurement with low battery",
+                "Observe the device's display"
+            ],
+            "expected_result": "The device aborts the measurement and displays error code E4"
+        }
+    ],
+    "status": "success",
+    "created_at": "2026-07-16T16:37:17.093346",
+    "errors": null
+}
+
+### POST /documents/2/ingest
+HTTP 201
+{
+    "document": {
+        "id": 2,
+        "name": "CT-200 Manual",
+        "created_at": "2026-07-16T16:37:16.048957"
+    },
+    "version": {
+        "id": 4,
+        "document_id": 2,
+        "version_number": 2,
+        "ingested_at": "2026-07-16T16:37:17.195979",
+        "source_filename": "ct200_manual_v2.md"
+    },
+    "node_count": 29,
+    "root_node_id": 86,
+    "irregularities": [
+        {
+            "kind": "unnumbered_document_title",
+            "description": "Document title 'CardioTrack CT-200 Home Blood Pressure Monitor \u2014 Technical & User Manual' has no numeric prefix.",
+            "handling": "Used as the synthetic root node heading; not a numbered section.",
+            "location": "# CardioTrack CT-200 Home Blood Pressure Monitor \u2014 Technical & User Manual"
+        },
+        {
+            "kind": "orphan_preamble_content",
+            "description": "Content appears before the first numbered heading ('<!-- TODO: confirm with regulatory -->').",
+            "handling": "Attached to the synthetic root node body and logged.",
+            "location": "before first numbered section"
+        },
+        {
+            "kind": "html_comment_in_preamble",
+            "description": "HTML comment found in pre-heading content.",
+            "handling": "Preserved verbatim in root node body.",
+            "location": "<!-- TODO: confirm with regulatory -->"
+        },
+        {
+            "kind": "markdown_depth_mismatch",
+            "description": "Heading 2.1.1.1 uses 4 markdown # markers but numeric prefix implies level 4 (expected 5 # markers).",
+            "handling": "Node level and parent assignment use numeric prefix depth only.",
+            "location": "#### 2.1.1.1 Battery Life Under Typical Use"
+        },
+        {
+            "kind": "markdown_depth_mismatch",
+            "description": "Heading 3.2 uses 4 markdown # markers but numeric prefix implies level 2 (expected 3 # markers).",
+            "handling": "Node level and parent assignment use numeric prefix depth only.",
+            "location": "#### 3.2 Cuff Inflation Sequence"
+        },
+        {
+            "kind": "file_order_mismatch",
+            "description": "Section 3.3 (Result Display and Classification) appears in the file after 3.4 but numeric order says it should come before.",
+            "handling": "Sibling order is determined by numeric path sorting, not file order.",
+            "location": "### 3.3 Result Display and Classification"
+        },
+        {
+            "kind": "duplicate_heading_title",
+            "description": "Heading title 'Error Codes' appears at multiple paths: 4.2, 7.1.",
+            "handling": "Each path produces a distinct node with its own logical_id, parent, and body.",
+            "location": null
+        },
+        {
+            "kind": "markdown_table_in_body",
+            "description": "Section 2.1 contains a markdown table (9 row(s)).",
+            "handling": "Table lines are kept in section body; only markdown # lines are treated as headings.",
+            "location": "### 2.1 General Specifications"
+        },
+        {
+            "kind": "ordered_list_in_body",
+            "description": "Section 3.3 contains an ordered list (5 item(s)) that could be mistaken for numbered headings.",
+            "handling": "List items stay in body because they lack a leading # marker.",
+            "location": "### 3.3 Result Display and Classification"
+        },
+        {
+            "kind": "markdown_table_in_body",
+            "description": "Section 4.2 contains a markdown table (8 row(s)).",
+            "handling": "Table lines are kept in section body; only markdown # lines are treated as headings.",
+            "location": "### 4.2 Error Codes"
+        },
+        {
+            "kind": "missing_intermediate_parent",
+            "description": "Section 2.1.1.1 implies parent 2.1.1, but that heading does not exist.",
+            "handling": "Attached to nearest existing ancestor at path 2.1.",
+            "location": "#### 2.1.1.1 Battery Life Under Typical Use"
+        }
+    ],
+    "changes": {
+        "from_version": 1,
+        "to_version": 2,
+        "changed": [
+            {
+                "logical_id": "2.1.1.1",
+                "status": "changed",
+                "previous_node_id": 64,
+                "current_node_id": 92
+            },
+            {
+                "logical_id": "3.2",
+                "status": "changed",
+                "previous_node_id": 68,
+                "current_node_id": 96
+            },
+            {
+                "logical_id": "4.2",
+                "status": "changed",
+                "previous_node_id": 73,
+                "current_node_id": 101
+            },
+            {
+                "logical_id": "4.3",
+                "status": "changed",
+                "previous_node_id": 74,
+                "current_node_id": 102
+            }
+        ],
+        "inserted": [
+            {
+                "logical_id": "5.3",
+                "status": "inserted",
+                "previous_node_id": null,
+                "current_node_id": 106
+            }
+        ],
+        "removed": []
+    }
+}
+
+### GET /documents/2/nodes/4.2/diff?from=1&to=2
+HTTP 200
+{
+    "document_id": 2,
+    "logical_id": "4.2",
+    "from_version": 1,
+    "to_version": 2,
+    "status": "changed",
+    "changed": true,
+    "old_node_id": 73,
+    "new_node_id": 101,
+    "old_body": "| Code | Meaning | Device Behavior |\n|---|---|---|\n| E1 | Cuff not connected or leak detected | Aborts measurement, displays E1 |\n| E2 | Motion artifact detected during measurement | Aborts measurement, displays E2, prompts retry |\n| E3 | Overpressure condition | Auto-deflates within 2 seconds, displays E3 |\n| E4 | Low battery during measurement | Aborts measurement, displays E4 |\n| E5 | Internal sensor fault | Device disables measurement function, displays E5 until serviced |",
+    "new_body": "| Code | Meaning | Device Behavior |\n|---|---|---|\n| E1 | Cuff not connected or leak detected | Aborts measurement, displays E1 |\n| E2 | Motion artifact detected during measurement | Aborts measurement, displays E2, prompts retry |\n| E3 | Overpressure condition | Auto-deflates within 1.5 seconds, displays E3 |\n| E4 | Low battery during measurement | Aborts measurement, displays E4 |\n| E5 | Internal sensor fault | Device disables measurement function, displays E5 until serviced |\n| E6 | Bluetooth sync failure | Displays E6 on next sync attempt; does not affect measurement |"
+}
+
+### GET /documents/2/nodes/3.2/diff?from=1&to=2
+HTTP 200
+{
+    "document_id": 2,
+    "logical_id": "3.2",
+    "from_version": 1,
+    "to_version": 2,
+    "status": "changed",
+    "changed": true,
+    "old_node_id": 68,
+    "new_node_id": 96,
+    "old_body": "On starting a measurement, the device inflates the cuff to an initial target of 180 mmHg. If the user's pulse is not detected by 180 mmHg, the device inflates in 40 mmHg increments up to a maximum of 299 mmHg before aborting with an error. Deflation occurs in controlled steps of approximately 3 mmHg to capture oscillometric pulse data.",
+    "new_body": "On starting a measurement, the device inflates the cuff to an initial target of 180 mmHg. If the user's pulse is not detected by 180 mmHg, the device inflates in 30 mmHg increments up to a maximum of 299 mmHg before aborting with an error. Deflation occurs in controlled steps of approximately 3 mmHg to capture oscillometric pulse data. Increment size was reduced from the original 40 mmHg to improve pulse-detection reliability in field testing."
+}
+
+### GET /generations/8c7e20a2-d7c6-4bb7-9ead-01cc133343ce
+HTTP 200
+{
+    "generation_id": "8c7e20a2-d7c6-4bb7-9ead-01cc133343ce",
+    "selection_id": 2,
+    "node_snapshot": [
+        {
+            "node_id": 73,
+            "logical_id": "4.2",
+            "content_hash": "864da8ae48c595a4723efe308e57624220d1a32ada1b4edeafa140a983377e65"
+        },
+        {
+            "node_id": 68,
+            "logical_id": "3.2",
+            "content_hash": "a1f73152526532cf4692d15ffc9516518dceea83d6ae73a8ed153ea6e946fa1f"
+        }
+    ],
+    "prompt_used": "You are a QA analyst creating concise test case ideas from selected medical-device manual sections.\n\nGenerate 3 to 5 QA test case ideas that verify the behavior, limits, and user-visible outcomes described in the selected sections.\n\nReturn ONLY valid JSON. Do not include markdown fences. Do not include prose before or after the JSON.\n\nThe JSON must have exactly this shape:\n{\n  \"test_cases\": [\n    {\n      \"title\": \"short descriptive title\",\n      \"steps\": [\"step 1\", \"step 2\"],\n      \"expected_result\": \"observable expected result\"\n    }\n  ]\n}\n\nRules:\n- Produce between 3 and 5 test cases.\n- Each title must be non-empty.\n- Each test case must have at least one step.\n- Each expected_result must be non-empty.\n- Base every test case only on the selected source sections below.\n\nSelected source sections:\nLogical ID: 4.2\nHeading: Error Codes\nBody:\n| Code | Meaning | Device Behavior |\n|---|---|---|\n| E1 | Cuff not connected or leak detected | Aborts measurement, displays E1 |\n| E2 | Motion artifact detected during measurement | Aborts measurement, displays E2, prompts retry |\n| E3 | Overpressure condition | Auto-deflates within 2 seconds, displays E3 |\n| E4 | Low battery during measurement | Aborts measurement, displays E4 |\n| E5 | Internal sensor fault | Device disables measurement function, displays E5 until serviced |\n\n---\n\nLogical ID: 3.2\nHeading: Cuff Inflation Sequence\nBody:\nOn starting a measurement, the device inflates the cuff to an initial target of 180 mmHg. If the user's pulse is not detected by 180 mmHg, the device inflates in 40 mmHg increments up to a maximum of 299 mmHg before aborting with an error. Deflation occurs in controlled steps of approximately 3 mmHg to capture oscillometric pulse data.\n",
+    "raw_llm_response": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Cuff Not Connected Error\",\n      \"steps\": [\"Start a measurement with the cuff not connected\", \"Observe the device's display\"],\n      \"expected_result\": \"The device displays error code E1 and aborts the measurement\"\n    },\n    {\n      \"title\": \"Motion Artifact Detection\",\n      \"steps\": [\"Start a measurement\", \"Introduce motion during the measurement\", \"Observe the device's display\"],\n      \"expected_result\": \"The device displays error code E2, aborts the measurement, and prompts the user to retry\"\n    },\n    {\n      \"title\": \"Cuff Inflation Sequence\",\n      \"steps\": [\"Start a measurement with the cuff connected\", \"Monitor the cuff pressure\"],\n      \"expected_result\": \"The device inflates the cuff to 180 mmHg, then in 40 mmHg increments up to 299 mmHg if the user's pulse is not detected, before aborting with an error\"\n    },\n    {\n      \"title\": \"Overpressure Condition\",\n      \"steps\": [\"Start a measurement\", \"Simulate an overpressure condition\"],\n      \"expected_result\": \"The device auto-deflates within 2 seconds and displays error code E3\"\n    },\n    {\n      \"title\": \"Low Battery During Measurement\",\n      \"steps\": [\"Start a measurement with low battery\", \"Observe the device's display\"],\n      \"expected_result\": \"The device aborts the measurement and displays error code E4\"\n    }\n  ]\n}",
+    "parsed_test_cases": [
+        {
+            "title": "Cuff Not Connected Error",
+            "steps": [
+                "Start a measurement with the cuff not connected",
+                "Observe the device's display"
+            ],
+            "expected_result": "The device displays error code E1 and aborts the measurement"
+        },
+        {
+            "title": "Motion Artifact Detection",
+            "steps": [
+                "Start a measurement",
+                "Introduce motion during the measurement",
+                "Observe the device's display"
+            ],
+            "expected_result": "The device displays error code E2, aborts the measurement, and prompts the user to retry"
+        },
+        {
+            "title": "Cuff Inflation Sequence",
+            "steps": [
+                "Start a measurement with the cuff connected",
+                "Monitor the cuff pressure"
+            ],
+            "expected_result": "The device inflates the cuff to 180 mmHg, then in 40 mmHg increments up to 299 mmHg if the user's pulse is not detected, before aborting with an error"
+        },
+        {
+            "title": "Overpressure Condition",
+            "steps": [
+                "Start a measurement",
+                "Simulate an overpressure condition"
+            ],
+            "expected_result": "The device auto-deflates within 2 seconds and displays error code E3"
+        },
+        {
+            "title": "Low Battery During Measurement",
+            "steps": [
+                "Start a measurement with low battery",
+                "Observe the device's display"
+            ],
+            "expected_result": "The device aborts the measurement and displays error code E4"
+        }
+    ],
+    "status": "success",
+    "created_at": "2026-07-16T16:37:17.093346",
+    "staleness": {
+        "document_id": 2,
+        "latest_version": 2,
+        "is_stale": true,
+        "nodes": [
+            {
+                "node_id": 73,
+                "logical_id": "4.2",
+                "status": "changed",
+                "old_content_hash": "864da8ae48c595a4723efe308e57624220d1a32ada1b4edeafa140a983377e65",
+                "current_content_hash": "24f1104cce51a41930ac7aed3a5f687c39b2aabd81938ab1cd01126bce97e029",
+                "current_node_id": 101
+            },
+            {
+                "node_id": 68,
+                "logical_id": "3.2",
+                "status": "changed",
+                "old_content_hash": "a1f73152526532cf4692d15ffc9516518dceea83d6ae73a8ed153ea6e946fa1f",
+                "current_content_hash": "55ebaee831ad851bfc5532389dde25f00bd5e2e7a3bf8b0c0f47651a1cdf1f52",
+                "current_node_id": 96
+            }
+        ]
+    }
+}
+
+### POST /selections/2/generate
+HTTP 200
+{
+    "generation_id": "95a9ea3e-2feb-49c1-9458-5b956e250834",
+    "selection_id": 2,
+    "node_snapshot": [
+        {
+            "node_id": 73,
+            "logical_id": "4.2",
+            "content_hash": "864da8ae48c595a4723efe308e57624220d1a32ada1b4edeafa140a983377e65"
+        },
+        {
+            "node_id": 68,
+            "logical_id": "3.2",
+            "content_hash": "a1f73152526532cf4692d15ffc9516518dceea83d6ae73a8ed153ea6e946fa1f"
+        }
+    ],
+    "prompt_used": "You are a QA analyst creating concise test case ideas from selected medical-device manual sections.\n\nGenerate 3 to 5 QA test case ideas that verify the behavior, limits, and user-visible outcomes described in the selected sections.\n\nReturn ONLY valid JSON. Do not include markdown fences. Do not include prose before or after the JSON.\n\nThe JSON must have exactly this shape:\n{\n  \"test_cases\": [\n    {\n      \"title\": \"short descriptive title\",\n      \"steps\": [\"step 1\", \"step 2\"],\n      \"expected_result\": \"observable expected result\"\n    }\n  ]\n}\n\nRules:\n- Produce between 3 and 5 test cases.\n- Each title must be non-empty.\n- Each test case must have at least one step.\n- Each expected_result must be non-empty.\n- Base every test case only on the selected source sections below.\n\nSelected source sections:\nLogical ID: 4.2\nHeading: Error Codes\nBody:\n| Code | Meaning | Device Behavior |\n|---|---|---|\n| E1 | Cuff not connected or leak detected | Aborts measurement, displays E1 |\n| E2 | Motion artifact detected during measurement | Aborts measurement, displays E2, prompts retry |\n| E3 | Overpressure condition | Auto-deflates within 2 seconds, displays E3 |\n| E4 | Low battery during measurement | Aborts measurement, displays E4 |\n| E5 | Internal sensor fault | Device disables measurement function, displays E5 until serviced |\n\n---\n\nLogical ID: 3.2\nHeading: Cuff Inflation Sequence\nBody:\nOn starting a measurement, the device inflates the cuff to an initial target of 180 mmHg. If the user's pulse is not detected by 180 mmHg, the device inflates in 40 mmHg increments up to a maximum of 299 mmHg before aborting with an error. Deflation occurs in controlled steps of approximately 3 mmHg to capture oscillometric pulse data.\n",
+    "raw_llm_response": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Cuff Not Connected Error\",\n      \"steps\": [\"Start a measurement with the cuff not connected\", \"Observe the device's behavior\"],\n      \"expected_result\": \"The device aborts the measurement and displays error code E1\"\n    },\n    {\n      \"title\": \"Motion Artifact Detection\",\n      \"steps\": [\"Start a measurement\", \"Introduce motion during the measurement to trigger an artifact detection\"],\n      \"expected_result\": \"The device aborts the measurement, displays error code E2, and prompts the user to retry\"\n    },\n    {\n      \"title\": \"Cuff Inflation Sequence\",\n      \"steps\": [\"Start a measurement with the cuff connected\", \"Monitor the cuff pressure during inflation\"],\n      \"expected_result\": \"The device inflates the cuff to an initial target of 180 mmHg and then in 40 mmHg increments up to a maximum of 299 mmHg if the user's pulse is not detected\"\n    },\n    {\n      \"title\": \"Overpressure Condition\",\n      \"steps\": [\"Start a measurement\", \"Simulate an overpressure condition\"],\n      \"expected_result\": \"The device auto-deflates within 2 seconds and displays error code E3\"\n    },\n    {\n      \"title\": \"Low Battery During Measurement\",\n      \"steps\": [\"Start a measurement with low battery\", \"Observe the device's behavior\"],\n      \"expected_result\": \"The device aborts the measurement and displays error code E4\"\n    }\n  ]\n}",
+    "parsed_test_cases": [
+        {
+            "title": "Cuff Not Connected Error",
+            "steps": [
+                "Start a measurement with the cuff not connected",
+                "Observe the device's behavior"
+            ],
+            "expected_result": "The device aborts the measurement and displays error code E1"
+        },
+        {
+            "title": "Motion Artifact Detection",
+            "steps": [
+                "Start a measurement",
+                "Introduce motion during the measurement to trigger an artifact detection"
+            ],
+            "expected_result": "The device aborts the measurement, displays error code E2, and prompts the user to retry"
+        },
+        {
+            "title": "Cuff Inflation Sequence",
+            "steps": [
+                "Start a measurement with the cuff connected",
+                "Monitor the cuff pressure during inflation"
+            ],
+            "expected_result": "The device inflates the cuff to an initial target of 180 mmHg and then in 40 mmHg increments up to a maximum of 299 mmHg if the user's pulse is not detected"
+        },
+        {
+            "title": "Overpressure Condition",
+            "steps": [
+                "Start a measurement",
+                "Simulate an overpressure condition"
+            ],
+            "expected_result": "The device auto-deflates within 2 seconds and displays error code E3"
+        },
+        {
+            "title": "Low Battery During Measurement",
+            "steps": [
+                "Start a measurement with low battery",
+                "Observe the device's behavior"
+            ],
+            "expected_result": "The device aborts the measurement and displays error code E4"
+        }
+    ],
+    "status": "success",
+    "created_at": "2026-07-16T16:37:18.971693",
+    "errors": null
+}
+
+### duplicate generation policy
+first_generation_id=8c7e20a2-d7c6-4bb7-9ead-01cc133343ce
+second_generation_id=95a9ea3e-2feb-49c1-9458-5b956e250834
+Result: second /generate call created a new generation record.
+
+### GET /generations?selection_id=2
+HTTP 200
+[
+    {
+        "generation_id": "8c7e20a2-d7c6-4bb7-9ead-01cc133343ce",
+        "selection_id": 2,
+        "node_snapshot": [
+            {
+                "node_id": 73,
+                "logical_id": "4.2",
+                "content_hash": "864da8ae48c595a4723efe308e57624220d1a32ada1b4edeafa140a983377e65"
+            },
+            {
+                "node_id": 68,
+                "logical_id": "3.2",
+                "content_hash": "a1f73152526532cf4692d15ffc9516518dceea83d6ae73a8ed153ea6e946fa1f"
+            }
+        ],
+        "prompt_used": "You are a QA analyst creating concise test case ideas from selected medical-device manual sections.\n\nGenerate 3 to 5 QA test case ideas that verify the behavior, limits, and user-visible outcomes described in the selected sections.\n\nReturn ONLY valid JSON. Do not include markdown fences. Do not include prose before or after the JSON.\n\nThe JSON must have exactly this shape:\n{\n  \"test_cases\": [\n    {\n      \"title\": \"short descriptive title\",\n      \"steps\": [\"step 1\", \"step 2\"],\n      \"expected_result\": \"observable expected result\"\n    }\n  ]\n}\n\nRules:\n- Produce between 3 and 5 test cases.\n- Each title must be non-empty.\n- Each test case must have at least one step.\n- Each expected_result must be non-empty.\n- Base every test case only on the selected source sections below.\n\nSelected source sections:\nLogical ID: 4.2\nHeading: Error Codes\nBody:\n| Code | Meaning | Device Behavior |\n|---|---|---|\n| E1 | Cuff not connected or leak detected | Aborts measurement, displays E1 |\n| E2 | Motion artifact detected during measurement | Aborts measurement, displays E2, prompts retry |\n| E3 | Overpressure condition | Auto-deflates within 2 seconds, displays E3 |\n| E4 | Low battery during measurement | Aborts measurement, displays E4 |\n| E5 | Internal sensor fault | Device disables measurement function, displays E5 until serviced |\n\n---\n\nLogical ID: 3.2\nHeading: Cuff Inflation Sequence\nBody:\nOn starting a measurement, the device inflates the cuff to an initial target of 180 mmHg. If the user's pulse is not detected by 180 mmHg, the device inflates in 40 mmHg increments up to a maximum of 299 mmHg before aborting with an error. Deflation occurs in controlled steps of approximately 3 mmHg to capture oscillometric pulse data.\n",
+        "raw_llm_response": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Cuff Not Connected Error\",\n      \"steps\": [\"Start a measurement with the cuff not connected\", \"Observe the device's display\"],\n      \"expected_result\": \"The device displays error code E1 and aborts the measurement\"\n    },\n    {\n      \"title\": \"Motion Artifact Detection\",\n      \"steps\": [\"Start a measurement\", \"Introduce motion during the measurement\", \"Observe the device's display\"],\n      \"expected_result\": \"The device displays error code E2, aborts the measurement, and prompts the user to retry\"\n    },\n    {\n      \"title\": \"Cuff Inflation Sequence\",\n      \"steps\": [\"Start a measurement with the cuff connected\", \"Monitor the cuff pressure\"],\n      \"expected_result\": \"The device inflates the cuff to 180 mmHg, then in 40 mmHg increments up to 299 mmHg if the user's pulse is not detected, before aborting with an error\"\n    },\n    {\n      \"title\": \"Overpressure Condition\",\n      \"steps\": [\"Start a measurement\", \"Simulate an overpressure condition\"],\n      \"expected_result\": \"The device auto-deflates within 2 seconds and displays error code E3\"\n    },\n    {\n      \"title\": \"Low Battery During Measurement\",\n      \"steps\": [\"Start a measurement with low battery\", \"Observe the device's display\"],\n      \"expected_result\": \"The device aborts the measurement and displays error code E4\"\n    }\n  ]\n}",
+        "parsed_test_cases": [
+            {
+                "title": "Cuff Not Connected Error",
+                "steps": [
+                    "Start a measurement with the cuff not connected",
+                    "Observe the device's display"
+                ],
+                "expected_result": "The device displays error code E1 and aborts the measurement"
+            },
+            {
+                "title": "Motion Artifact Detection",
+                "steps": [
+                    "Start a measurement",
+                    "Introduce motion during the measurement",
+                    "Observe the device's display"
+                ],
+                "expected_result": "The device displays error code E2, aborts the measurement, and prompts the user to retry"
+            },
+            {
+                "title": "Cuff Inflation Sequence",
+                "steps": [
+                    "Start a measurement with the cuff connected",
+                    "Monitor the cuff pressure"
+                ],
+                "expected_result": "The device inflates the cuff to 180 mmHg, then in 40 mmHg increments up to 299 mmHg if the user's pulse is not detected, before aborting with an error"
+            },
+            {
+                "title": "Overpressure Condition",
+                "steps": [
+                    "Start a measurement",
+                    "Simulate an overpressure condition"
+                ],
+                "expected_result": "The device auto-deflates within 2 seconds and displays error code E3"
+            },
+            {
+                "title": "Low Battery During Measurement",
+                "steps": [
+                    "Start a measurement with low battery",
+                    "Observe the device's display"
+                ],
+                "expected_result": "The device aborts the measurement and displays error code E4"
+            }
+        ],
+        "status": "success",
+        "created_at": "2026-07-16T16:37:17.093346",
+        "staleness": {
+            "document_id": 2,
+            "latest_version": 2,
+            "is_stale": true,
+            "nodes": [
+                {
+                    "node_id": 73,
+                    "logical_id": "4.2",
+                    "status": "changed",
+                    "old_content_hash": "864da8ae48c595a4723efe308e57624220d1a32ada1b4edeafa140a983377e65",
+                    "current_content_hash": "24f1104cce51a41930ac7aed3a5f687c39b2aabd81938ab1cd01126bce97e029",
+                    "current_node_id": 101
+                },
+                {
+                    "node_id": 68,
+                    "logical_id": "3.2",
+                    "status": "changed",
+                    "old_content_hash": "a1f73152526532cf4692d15ffc9516518dceea83d6ae73a8ed153ea6e946fa1f",
+                    "current_content_hash": "55ebaee831ad851bfc5532389dde25f00bd5e2e7a3bf8b0c0f47651a1cdf1f52",
+                    "current_node_id": 96
+                }
+            ]
+        }
+    },
+    {
+        "generation_id": "95a9ea3e-2feb-49c1-9458-5b956e250834",
+        "selection_id": 2,
+        "node_snapshot": [
+            {
+                "node_id": 73,
+                "logical_id": "4.2",
+                "content_hash": "864da8ae48c595a4723efe308e57624220d1a32ada1b4edeafa140a983377e65"
+            },
+            {
+                "node_id": 68,
+                "logical_id": "3.2",
+                "content_hash": "a1f73152526532cf4692d15ffc9516518dceea83d6ae73a8ed153ea6e946fa1f"
+            }
+        ],
+        "prompt_used": "You are a QA analyst creating concise test case ideas from selected medical-device manual sections.\n\nGenerate 3 to 5 QA test case ideas that verify the behavior, limits, and user-visible outcomes described in the selected sections.\n\nReturn ONLY valid JSON. Do not include markdown fences. Do not include prose before or after the JSON.\n\nThe JSON must have exactly this shape:\n{\n  \"test_cases\": [\n    {\n      \"title\": \"short descriptive title\",\n      \"steps\": [\"step 1\", \"step 2\"],\n      \"expected_result\": \"observable expected result\"\n    }\n  ]\n}\n\nRules:\n- Produce between 3 and 5 test cases.\n- Each title must be non-empty.\n- Each test case must have at least one step.\n- Each expected_result must be non-empty.\n- Base every test case only on the selected source sections below.\n\nSelected source sections:\nLogical ID: 4.2\nHeading: Error Codes\nBody:\n| Code | Meaning | Device Behavior |\n|---|---|---|\n| E1 | Cuff not connected or leak detected | Aborts measurement, displays E1 |\n| E2 | Motion artifact detected during measurement | Aborts measurement, displays E2, prompts retry |\n| E3 | Overpressure condition | Auto-deflates within 2 seconds, displays E3 |\n| E4 | Low battery during measurement | Aborts measurement, displays E4 |\n| E5 | Internal sensor fault | Device disables measurement function, displays E5 until serviced |\n\n---\n\nLogical ID: 3.2\nHeading: Cuff Inflation Sequence\nBody:\nOn starting a measurement, the device inflates the cuff to an initial target of 180 mmHg. If the user's pulse is not detected by 180 mmHg, the device inflates in 40 mmHg increments up to a maximum of 299 mmHg before aborting with an error. Deflation occurs in controlled steps of approximately 3 mmHg to capture oscillometric pulse data.\n",
+        "raw_llm_response": "{\n  \"test_cases\": [\n    {\n      \"title\": \"Cuff Not Connected Error\",\n      \"steps\": [\"Start a measurement with the cuff not connected\", \"Observe the device's behavior\"],\n      \"expected_result\": \"The device aborts the measurement and displays error code E1\"\n    },\n    {\n      \"title\": \"Motion Artifact Detection\",\n      \"steps\": [\"Start a measurement\", \"Introduce motion during the measurement to trigger an artifact detection\"],\n      \"expected_result\": \"The device aborts the measurement, displays error code E2, and prompts the user to retry\"\n    },\n    {\n      \"title\": \"Cuff Inflation Sequence\",\n      \"steps\": [\"Start a measurement with the cuff connected\", \"Monitor the cuff pressure during inflation\"],\n      \"expected_result\": \"The device inflates the cuff to an initial target of 180 mmHg and then in 40 mmHg increments up to a maximum of 299 mmHg if the user's pulse is not detected\"\n    },\n    {\n      \"title\": \"Overpressure Condition\",\n      \"steps\": [\"Start a measurement\", \"Simulate an overpressure condition\"],\n      \"expected_result\": \"The device auto-deflates within 2 seconds and displays error code E3\"\n    },\n    {\n      \"title\": \"Low Battery During Measurement\",\n      \"steps\": [\"Start a measurement with low battery\", \"Observe the device's behavior\"],\n      \"expected_result\": \"The device aborts the measurement and displays error code E4\"\n    }\n  ]\n}",
+        "parsed_test_cases": [
+            {
+                "title": "Cuff Not Connected Error",
+                "steps": [
+                    "Start a measurement with the cuff not connected",
+                    "Observe the device's behavior"
+                ],
+                "expected_result": "The device aborts the measurement and displays error code E1"
+            },
+            {
+                "title": "Motion Artifact Detection",
+                "steps": [
+                    "Start a measurement",
+                    "Introduce motion during the measurement to trigger an artifact detection"
+                ],
+                "expected_result": "The device aborts the measurement, displays error code E2, and prompts the user to retry"
+            },
+            {
+                "title": "Cuff Inflation Sequence",
+                "steps": [
+                    "Start a measurement with the cuff connected",
+                    "Monitor the cuff pressure during inflation"
+                ],
+                "expected_result": "The device inflates the cuff to an initial target of 180 mmHg and then in 40 mmHg increments up to a maximum of 299 mmHg if the user's pulse is not detected"
+            },
+            {
+                "title": "Overpressure Condition",
+                "steps": [
+                    "Start a measurement",
+                    "Simulate an overpressure condition"
+                ],
+                "expected_result": "The device auto-deflates within 2 seconds and displays error code E3"
+            },
+            {
+                "title": "Low Battery During Measurement",
+                "steps": [
+                    "Start a measurement with low battery",
+                    "Observe the device's behavior"
+                ],
+                "expected_result": "The device aborts the measurement and displays error code E4"
+            }
+        ],
+        "status": "success",
+        "created_at": "2026-07-16T16:37:18.971693",
+        "staleness": {
+            "document_id": 2,
+            "latest_version": 2,
+            "is_stale": true,
+            "nodes": [
+                {
+                    "node_id": 73,
+                    "logical_id": "4.2",
+                    "status": "changed",
+                    "old_content_hash": "864da8ae48c595a4723efe308e57624220d1a32ada1b4edeafa140a983377e65",
+                    "current_content_hash": "24f1104cce51a41930ac7aed3a5f687c39b2aabd81938ab1cd01126bce97e029",
+                    "current_node_id": 101
+                },
+                {
+                    "node_id": 68,
+                    "logical_id": "3.2",
+                    "status": "changed",
+                    "old_content_hash": "a1f73152526532cf4692d15ffc9516518dceea83d6ae73a8ed153ea6e946fa1f",
+                    "current_content_hash": "55ebaee831ad851bfc5532389dde25f00bd5e2e7a3bf8b0c0f47651a1cdf1f52",
+                    "current_node_id": 96
+                }
+            ]
+        }
+    }
+]
