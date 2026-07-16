@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -147,10 +148,23 @@ class NodeDiffResponse(BaseModel):
     new_body: str | None = None
 
 
+class GenerationRecordRead(BaseModel):
+    generation_id: str
+    selection_id: int
+    node_snapshot: list[dict[str, Any]]
+    prompt_used: str
+    raw_llm_response: str
+    parsed_test_cases: list[dict[str, Any]]
+    status: str
+    created_at: str
+    errors: list[str] | None = None
+
+
 __all__ = [
     "DocumentCreate",
     "DocumentRead",
     "DocumentVersionRead",
+    "GenerationRecordRead",
     "IngestResponse",
     "NodeChangeRead",
     "NodeDiffResponse",

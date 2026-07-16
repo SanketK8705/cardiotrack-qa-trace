@@ -4,12 +4,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.ingest import get_db
+from app.llm.client import call_groq
+from app.llm.prompt import PromptNode, build_test_case_prompt
+from app.llm.validate import generate_with_retries
 from app.models import Node, Selection, SelectionNode
 from app.schemas import (
+    GenerationRecordRead,
     SelectionCreate,
     SelectionDetailRead,
     SelectionPinnedNodeRead,
 )
+from app.storage.generations import append_generation_record
 
 router = APIRouter(prefix="/selections", tags=["selections"])
 
@@ -89,3 +94,53 @@ def get_selection(
             detail=f"Selection {selection_id} not found.",
         )
     return _selection_response(selection)
+
+
+@router.post("/{selection_id}/generate", response_model=GenerationRecordRead)
+def generate_test_cases(
+    selection_id: int,
+    db: Session = Depends(get_db),
+) -> dict:
+    selection = db.get(Selection, selection_id)
+    if selection is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Selection {selection_id} not found.",
+        )
+    if not selection.nodes:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"Selection {selection_id} has no pinned nodes.",
+        )
+
+    selected_nodes = [link.node for link in selection.nodes]
+    prompt_nodes: list[PromptNode] = [
+        {
+            "logical_id": node.logical_id,
+            "heading": node.heading,
+            "body": node.body,
+        }
+        for node in selected_nodes
+    ]
+    prompt = build_test_case_prompt(prompt_nodes)
+    result = generate_with_retries(prompt, call_groq)
+    node_snapshot = [
+        {
+            "node_id": node.id,
+            "logical_id": node.logical_id,
+            "content_hash": node.content_hash,
+        }
+        for node in selected_nodes
+    ]
+
+    # Every call creates a new immutable generation record. We keep full history
+    # instead of overwriting or reusing prior attempts for the same selection.
+    return append_generation_record(
+        selection_id=selection.id,
+        node_snapshot=node_snapshot,
+        prompt_used=prompt,
+        raw_llm_response=result.raw_response,
+        parsed_test_cases=[item.model_dump() for item in result.parsed_test_cases],
+        status=result.status,
+        errors=result.errors if result.status == "failed" else None,
+    )
