@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class DocumentCreate(BaseModel):
@@ -71,12 +71,41 @@ class ParserIrregularityRead(BaseModel):
     location: str | None = None
 
 
+class NodeChangeRead(BaseModel):
+    logical_id: str
+    status: str
+    previous_node_id: int | None = None
+    current_node_id: int | None = None
+
+
+class VersionChangeSummary(BaseModel):
+    from_version: int | None = None
+    to_version: int
+    changed: list[NodeChangeRead] = Field(default_factory=list)
+    inserted: list[NodeChangeRead] = Field(default_factory=list)
+    removed: list[NodeChangeRead] = Field(default_factory=list)
+
+
 class IngestResponse(BaseModel):
     document: DocumentRead
     version: DocumentVersionRead
     node_count: int
     root_node_id: int
     irregularities: list[ParserIrregularityRead]
+    changes: VersionChangeSummary | None = None
+
+
+class NodeDiffResponse(BaseModel):
+    document_id: int
+    logical_id: str
+    from_version: int
+    to_version: int
+    status: str
+    changed: bool
+    old_node_id: int | None = None
+    new_node_id: int | None = None
+    old_body: str | None = None
+    new_body: str | None = None
 
 
 __all__ = [
@@ -84,9 +113,12 @@ __all__ = [
     "DocumentRead",
     "DocumentVersionRead",
     "IngestResponse",
+    "NodeChangeRead",
+    "NodeDiffResponse",
     "NodeRead",
     "ParserIrregularityRead",
     "SelectionCreate",
     "SelectionNodeRead",
     "SelectionRead",
+    "VersionChangeSummary",
 ]
