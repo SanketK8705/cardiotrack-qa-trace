@@ -43,6 +43,30 @@ class NodeRead(BaseModel):
     order_index: int
 
 
+class NodeSummaryRead(BaseModel):
+    id: int
+    logical_id: str
+    heading: str
+    level: int
+    parent_id: int | None
+    order_index: int
+
+
+class SectionRead(NodeSummaryRead):
+    children: list[NodeSummaryRead] = Field(default_factory=list)
+
+
+class NodeDetailRead(NodeRead):
+    children: list[NodeSummaryRead] = Field(default_factory=list)
+
+
+class SearchResultRead(BaseModel):
+    id: int
+    logical_id: str
+    heading: str
+    snippet: str
+
+
 class SelectionCreate(BaseModel):
     name: str
     node_ids: list[int] = []
@@ -115,10 +139,14 @@ __all__ = [
     "IngestResponse",
     "NodeChangeRead",
     "NodeDiffResponse",
+    "NodeDetailRead",
     "NodeRead",
+    "NodeSummaryRead",
     "ParserIrregularityRead",
+    "SearchResultRead",
     "SelectionCreate",
     "SelectionNodeRead",
     "SelectionRead",
+    "SectionRead",
     "VersionChangeSummary",
 ]
