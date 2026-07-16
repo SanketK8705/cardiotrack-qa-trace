@@ -69,7 +69,7 @@ class SearchResultRead(BaseModel):
 
 class SelectionCreate(BaseModel):
     name: str
-    node_ids: list[int] = []
+    node_ids: list[int] = Field(default_factory=list)
 
 
 class SelectionRead(BaseModel):
@@ -86,6 +86,21 @@ class SelectionNodeRead(BaseModel):
     id: int
     selection_id: int
     node_id: int
+
+
+class SelectionPinnedNodeRead(BaseModel):
+    id: int
+    logical_id: str
+    heading: str
+    version_id: int
+    body: str
+
+
+class SelectionDetailRead(BaseModel):
+    id: int
+    name: str
+    created_at: datetime
+    nodes: list[SelectionPinnedNodeRead] = Field(default_factory=list)
 
 
 class ParserIrregularityRead(BaseModel):
@@ -145,7 +160,9 @@ __all__ = [
     "ParserIrregularityRead",
     "SearchResultRead",
     "SelectionCreate",
+    "SelectionDetailRead",
     "SelectionNodeRead",
+    "SelectionPinnedNodeRead",
     "SelectionRead",
     "SectionRead",
     "VersionChangeSummary",
