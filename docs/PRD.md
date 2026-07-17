@@ -1,4 +1,4 @@
-**App Name:** CT-Doc-Trace
+**App Name:** CardioTrack QA Trace
 
 **Tagline:** Versioned document tree + AI test-case generator with built-in staleness detection.
 
