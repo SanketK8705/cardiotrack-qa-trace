@@ -88,7 +88,7 @@ The retry policy is simple: try the LLM call up to 3 total attempts. If parsing 
 
 Duplicate submissions always create a new generation record. I went with that because LLM output is non-deterministic, and overwriting would make it hard to explain what happened later. The Phase 9 list endpoint can show every attempt. This is noisier, but safer for auditability.
 
-The Groq client reads `GROQ_API_KEY` and defaults to `llama-3.1-8b-instant`. In my local verification environment the key was not configured, so I tested the endpoint with a deterministic mocked LLM response and separately mocked malformed output to prove the failure path.
+The Groq client reads `GROQ_API_KEY` and defaults to `llama-3.1-8b-instant`. Automated tests use a mocked LLM client to keep them deterministic and fast, covering both valid responses and malformed/wrong-shape failure paths. I also verified the real Groq integration manually end-to-end with `GROQ_API_KEY` configured — confirmed structured output parsing, retry behavior, and staleness detection all work correctly against live model output.
 
 ## Staleness
 
