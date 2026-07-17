@@ -1,74 +1,72 @@
 # Approach
 
-This project is built around one assumption: the manual's numbered headings are meaningful enough to become stable IDs. Once I trusted that, the rest of the shape got simpler. Parse the document into numbered nodes, store every ingest as a new version, let selections point at concrete node rows, and compare hashes later to see whether old generated tests might be stale.
+The whole project rests on one bet: the manual's numbered headings (4.2, 3.2.1, etc.) are stable enough to use as IDs. Once I committed to that, everything else fell into place pretty naturally — parse the doc into numbered nodes, treat every ingest as a new version, let selections point at actual node rows, and compare hashes later to catch staleness.
 
-That assumption is useful, but not magic. The fixture had enough weirdness to make that clear.
+That bet mostly paid off, but it's not bulletproof, and the fixture document made sure I found the edges.
 
 ## Data model
 
-The database has `documents`, `document_versions`, `nodes`, `selections`, and `selection_nodes`.
+Five tables: `documents`, `document_versions`, `nodes`, `selections`, `selection_nodes`.
 
-`documents` is just the named thing being tracked. `document_versions` stores each ingest of that document, with a monotonically increasing `version_number`. Nodes are version-specific rows. That matters a lot: node `4.2` in v1 and node `4.2` in v2 are separate database rows, even though they share a `logical_id`.
+`documents` just tracks the named thing. `document_versions` holds one row per ingest, with a `version_number` that only goes up. Nodes are version-specific — node `4.2` in v1 and node `4.2` in v2 are two different rows in the database, even though they share a `logical_id`. That distinction turned out to matter a lot for how everything downstream works.
 
-`nodes` stores the parsed tree:
+Fields on `nodes`:
 
-- `logical_id` is the path key, like `4.2`.
-- `path` is currently the same value, kept because the schema asked for it and because it leaves room for display/path variations later.
-- `parent_id` is a self-reference for the tree.
-- `content_hash` is a SHA-256 hash of the node body.
-- `order_index` comes from numeric order, not file order.
+- `logical_id` — the numbered path, e.g. `4.2`
+- `path` — currently identical to `logical_id`; I kept it separate mostly because the schema called for it and it leaves room to diverge later
+- `parent_id` — self-referencing FK for the tree
+- `content_hash` — SHA-256 of the body text
+- `order_index` — derived from the numeric prefix, not file order
 
-`selections` and `selection_nodes` are deliberately small. A selection stores a list of exact `node_id` values. Since each node row belongs to one document version, this makes selections version-pinned without a separate pinning system. That was one of the nicer parts of the model.
+`selections` and `selection_nodes` are intentionally minimal. A selection just stores a list of concrete `node_id`s. Since a node row belongs to exactly one version, selections end up version-pinned for free — no separate pinning mechanism needed. Honestly one of the parts of this design I'm happiest with.
 
-Generations are in `data/generations.json`, not SQL. Each record stores the selection ID, the node snapshot at generation time, the prompt, the raw LLM response, parsed test cases, status, and timestamp. The snapshot is the important bit for Phase 9: `{node_id, logical_id, content_hash}` is enough to compare the generated output against the latest document later.
+Generations live in `data/generations.json`, not in SQL. Each record has the selection ID, a snapshot of the nodes used, the prompt, the raw LLM response, the parsed test cases, a status, and a timestamp. The snapshot — `{node_id, logical_id, content_hash}` — is what makes staleness checking possible later, without needing to touch SQL at all.
 
-## Tree parsing decisions
+## Parsing decisions
 
-The parser reads Markdown headings, extracts numeric prefixes, and builds an in-memory tree before anything touches the database. I made numeric prefixes the source of truth for hierarchy and sibling order. Markdown heading depth and file order are treated as hints at best.
+The parser reads markdown headings, pulls out numeric prefixes, and builds a tree in memory before anything hits the database. Numeric prefixes are the source of truth for both hierarchy and sibling order — markdown heading depth (`#`, `##`, etc.) and file order are just hints, and get overridden when they disagree with the numbers.
 
-Here are the actual irregularities from `data/ct200_manual.md` and how the parser handles them:
+Here's what actually showed up in `ct200_manual.md` and how I handled each case:
 
-- The document title has no numeric prefix: `# CardioTrack CT-200 Home Blood Pressure Monitor ...`. I use it as the synthetic root node heading, not as a numbered section.
+- **No numeric prefix on the title.** `# CardioTrack CT-200 Home Blood Pressure Monitor...` isn't a numbered section, so it becomes the synthetic root node's heading instead.
 
-- There is pre-heading content: `<!-- TODO: confirm with regulatory -->`. It gets attached to the synthetic root body. This was worth testing because dropping preamble text silently would be a bad habit.
+- **Content before any heading.** There's a stray `<!-- TODO: confirm with regulatory -->` before section 1 even starts. I attach it to the root node's body rather than dropping it — losing content silently felt like exactly the kind of bug this assignment was trying to surface.
 
-- That pre-heading content is an HTML comment. The parser preserves it verbatim in the root body.
+- **That pre-heading content happens to be an HTML comment.** Kept it verbatim in the root body, no special-casing.
 
-- `2.1.1.1 Battery Life Under Typical Use` uses four `#` markers, but the numeric prefix implies level 4, which would normally be five Markdown markers if the document title is counted separately. The parser trusts `2.1.1.1`, not the Markdown depth.
+- **`2.1.1.1 Battery Life Under Typical Use`** is written with four `#` markers, but its numeric prefix says it's four levels deep. A depth-based parser would get this wrong. I trust the number, not the `#` count.
 
-- `3.2 Cuff Inflation Sequence` uses four `#` markers even though the numeric prefix says it is a level-2 child of `3`. Again, numeric prefix wins. This one was annoying to get right because a Markdown-depth parser would attach it under `3.1`, which is just wrong for this document.
+- **`3.2 Cuff Inflation Sequence`** — same problem, four `#` markers but the number says it should be a level-2 child of `3`. This one actually tripped me up for a bit, because a naive depth-based parser attaches it under `3.1` instead of `3`, which is just wrong.
 
-- Section `3.4` appears before `3.3` in the file. Sibling order is sorted numerically, so `3.3` comes before `3.4` in the parsed tree.
+- **`3.4` appears in the file before `3.3`.** Sibling ordering is done by sorting the numeric path, not by reading order, so `3.3` still ends up before `3.4` in the tree.
 
-- The heading title `Error Codes` appears twice, at `4.2` and `7.1`. They become two distinct nodes. Matching by title would be broken here.
+- **"Error Codes" is used as a heading twice** — once at `4.2`, once at `7.1`. These become two separate nodes with separate IDs. This is the case that ruled out title-based matching for me later.
 
-- Section `2.1` contains a Markdown table. Table rows stay in the body. Only Markdown heading lines are treated as section boundaries.
+- **Markdown tables inside section bodies** (2.1 and 4.2). These stay as plain body text — only lines starting with `#` count as headings, so table rows never get mistaken for structure.
 
-- Section `3.3` contains an ordered list with items `1.` through `5.`. Those stay in the body too. They are not headings because they do not start with `#`.
+- **An ordered list (`1.` through `5.`) inside section 3.3.** Same reasoning — no leading `#`, so it stays in the body instead of being parsed as sub-headings.
 
-- Section `4.2` contains another Markdown table. Same handling: keep it as body text.
+- **`2.1.1.1` implies a parent `2.1.1` that doesn't exist.** The parser falls back to the nearest real ancestor, `2.1`, and logs it as a `missing_intermediate_parent` irregularity instead of silently failing or crashing.
 
-- `2.1.1.1` implies a parent `2.1.1`, but that heading does not exist. The parser attaches it to the nearest existing ancestor, `2.1`, and logs a `missing_intermediate_parent` irregularity.
-
-The parser tests focus on the places most likely to regress: numeric hierarchy beating Markdown depth, numeric order beating file order, duplicate headings staying distinct, preamble content staying on root, and the missing-intermediate-parent fallback.
+The unit tests target exactly these regressions: numeric hierarchy winning over markdown depth, numeric order winning over file order, duplicate headings staying distinct, preamble content landing on the root, and the missing-parent fallback.
 
 ## Version matching
 
-Versions are matched by `logical_id`, which is just the numbered heading path. So `4.2` in v1 and `4.2` in v2 are considered the same logical section.
+Nodes are matched across versions by `logical_id` — so `4.2` in v1 and `4.2` in v2 are treated as the same logical section, just two different rows.
 
-I picked that because the source document is already organized around numbered headings, and those numbers survive ordinary body edits and insertions. The v2 fixture is a good example: `5.3 Data Export` is inserted without disturbing `5.1` or `5.2`, and body edits to `3.2` and `4.2` are easy to detect by comparing hashes for the same `logical_id`.
+I went with this because the document is already organized around numbered headings, and those numbers tend to survive normal edits and insertions. The v2 fixture backs this up: `5.3 Data Export` gets inserted without touching `5.1` or `5.2` at all, and edits to `3.2` and `4.2` show up cleanly as hash mismatches on the same `logical_id`.
 
-The failure modes are real:
+Where it breaks:
 
-- If a section is renumbered but the text barely changes, this system treats it as removed plus inserted.
-- If a section is deleted and a new unrelated section later reuses the same number, this system treats it as the same logical node.
-- If the author stops numbering headings consistently, the parser can only do so much. Unnumbered structural sections are currently not merged into a nearby node in a clever way.
+- If a section gets renumbered but the text barely changes, the system sees it as one section removed and a new one inserted — not a rename.
+- If a section is deleted and a later section reuses the same number for something unrelated, the system will treat them as the same logical node, which is wrong.
+- If headings stop being numbered consistently somewhere in the document, there's no clever recovery — it just does the best it can with the intermediate-parent fallback.
 
-I would not use title matching as the fallback without more thought, because `4.2 Error Codes` and `7.1 Error Codes` are already a counterexample in the fixture.
+I deliberately didn't fall back to title matching, because the fixture already disproves it — `4.2 Error Codes` and `7.1 Error Codes` share a title but are clearly different sections.
 
 ## LLM generation
 
-The prompt takes selected nodes as `{logical_id, heading, body}` and asks for 3 to 5 QA test case ideas. The output contract is intentionally narrow:
+The prompt sends selected nodes as `{logical_id, heading, body}` and asks for 3–5 QA test case ideas. The expected output shape is narrow on purpose:
 
 ```json
 {
@@ -82,17 +80,17 @@ The prompt takes selected nodes as `{logical_id, heading, body}` and asks for 3 
 }
 ```
 
-The prompt explicitly says: return only valid JSON, no Markdown fences, no prose. That sounds blunt, but it is there because the next step is `json.loads` plus Pydantic validation. A polite paragraph before the JSON is still a failure for this API.
+The prompt is blunt about format — only valid JSON, no code fences, no explanatory text before or after. That's not me being fussy for no reason: the next step is `json.loads()` followed by Pydantic validation, and a friendly paragraph before the JSON breaks both.
 
-The retry policy is simple: try the LLM call up to 3 total attempts. If parsing or validation fails every time, store a failed generation record with the raw response and errors. Do not invent empty test cases, and do not pretend the operation succeeded.
+Retry logic: up to 3 attempts total. If every attempt fails to parse or validate, the system stores a failed generation record with the raw response and the errors attached — it does not fabricate empty test cases or pretend something succeeded when it didn't.
 
-Duplicate submissions always create a new generation record. I went with that because LLM output is non-deterministic, and overwriting would make it hard to explain what happened later. The Phase 9 list endpoint can show every attempt. This is noisier, but safer for auditability.
+If the same selection gets submitted twice, I always create a new generation record rather than overwriting or deduping. LLM output isn't deterministic, so overwriting would make it harder to reconstruct what actually happened on a given attempt. It's noisier, but you can list every generation for a selection and see the full history, which felt like the safer default for something meant to support QA auditability.
 
-The Groq client reads `GROQ_API_KEY` and defaults to `llama-3.1-8b-instant`. Automated tests use a mocked LLM client to keep them deterministic and fast, covering both valid responses and malformed/wrong-shape failure paths. I also verified the real Groq integration manually end-to-end with `GROQ_API_KEY` configured — confirmed structured output parsing, retry behavior, and staleness detection all work correctly against live model output.
+The Groq client reads `GROQ_API_KEY` and defaults to `llama-3.1-8b-instant`. The automated test suite mocks the LLM client so it stays fast and deterministic, and covers both the happy path and malformed/wrong-shape failures. I also ran the real integration manually with a live `GROQ_API_KEY` — confirmed the structured output parsing, retry behavior, and staleness detection all work correctly against actual model responses, not just mocks.
 
 ## Staleness
 
-A generation stores a snapshot of the nodes used at generation time:
+Every generation stores a snapshot of the nodes it was built from:
 
 ```json
 [
@@ -101,34 +99,34 @@ A generation stores a snapshot of the nodes used at generation time:
 ]
 ```
 
-At retrieval time, the API finds the latest version for the document, looks up each snapshot `logical_id`, and compares the latest node's `content_hash` to the saved hash. If they differ, that node is stale. If the logical ID no longer exists in the latest version, it is marked `removed`. The generation-level `is_stale` is true if any selected node is changed or removed.
+At retrieval time, the API looks up the latest version of the document, finds each snapshot's `logical_id` in that version, and compares content hashes. Different hash → stale. Missing `logical_id` entirely → marked removed. The generation-level `is_stale` flag is true if any node in the snapshot is either changed or removed.
 
-This is binary. It catches change, not meaning.
+It's a binary check. It tells you something changed, not what changed or how much it matters.
 
-That means `4.3` changing wording from `E1-E5` to `E1-E6` is treated the same kind of stale as `3.2` changing inflation increments from `40 mmHg` to `30 mmHg`. The second one is obviously more likely to invalidate generated tests. The hash does not know that. It just says "different body text." For this assignment, that is acceptable and easy to reason about, but it is not severity analysis.
+Concretely: if section `4.3` gets a wording tweak from "E1–E5" to "E1–E6," that's flagged exactly the same way as `3.2`'s inflation increment changing from 40 mmHg to 30 mmHg — even though one is a minor wording update and the other could invalidate an entire generated test case. The hash just sees "the text is different." For this assignment that tradeoff felt fine — it's simple, predictable, and easy to reason about — but it's not real severity analysis, and I'd want to fix that before trusting it in an actual regulated pipeline.
 
-## What I would do differently with more time
+## What I'd do differently with more time
 
-I would move generations into SQL. A JSON file is fine for a small demo, but it is the first thing I would replace because concurrent writes and querying will get awkward quickly.
+Move generations into SQL. The JSON file works fine for a demo, but it's the first thing that breaks under concurrent writes or any real querying needs.
 
-I would add real upload handling for ingest. Right now the API takes a `file_path`, partly because the early FastAPI upload route would have needed `python-multipart`, which was not in the dependency list. File paths were enough for the local flow, but they are not a real external API.
+Add real file upload handling. Right now ingest takes a `file_path` and reads from the server's own filesystem — partly because wiring up multipart uploads properly needed `python-multipart`, which wasn't in my dependency list at the time. It's fine for local testing but isn't how a real external API should take input.
 
-I would make parser irregularities first-class database records. Right now they are returned during ingest and logged, but they are not persisted. They are useful enough that I would want to inspect them later.
+Persist parser irregularities instead of just returning them at ingest time. Right now they're logged and returned in the response, but they don't live anywhere afterward — I'd want to be able to query them later.
 
-I would also add a semantic diff layer for staleness. Hashes are a good tripwire, but they cannot tell "typo fixed" from "safety threshold changed." Even a lightweight classifier or rules around numbers and units would be a big improvement.
+Add a semantic diff layer for staleness instead of relying on raw hash comparison. Hashing is a good tripwire but has no concept of "typo fix" versus "safety-critical threshold change." Even simple rules around numbers and units would go a long way.
 
-Finally, I would put more tests around the API endpoints. The parser tests are the strongest part right now. The later phases were mostly verified end-to-end with curl/TestClient scripts.
+Write more tests around the actual API endpoints. The parser tests are the strongest part of the suite right now — most of the later phases (versioning, selections, generation, staleness) were verified end-to-end manually with curl and TestClient rather than with a comprehensive automated suite.
 
 ## Decision log
 
 **1. What's the one part of this system most likely to silently give wrong results without erroring? How would you catch it?**
 
-Logical-ID matching is the risky part. If a document author renumbers a section or reuses a deleted number for unrelated content, the API can produce a plausible but wrong match; I would catch this by adding a secondary similarity check on heading/body and flagging low-similarity matches for review.
+Logical-ID matching. If a section gets renumbered, or a deleted number gets reused for something unrelated, the system will produce a confident, well-formed match that's just wrong — no error, no warning. I'd catch this by adding a secondary similarity check between the old and new body text whenever a logical_id "disappears" and a new one "appears" in the same diff, and flagging low-similarity pairs for a human to check.
 
 **2. Where did you choose simplicity over correctness because of time, and what would break first if this went to production as-is?**
 
-The JSON file generation store is the clearest shortcut. It was fast and readable, but concurrent generation requests could race, and filtering generations by selection or node will get clumsy as the file grows.
+Storing generations as a JSON file instead of a real table. It was fast to build and easy to inspect, but it has no protection against concurrent writes, and filtering by selection or node gets slower and messier as the file grows. That's the first thing that would fall over under any real load.
 
 **3. Name one input you did not handle, and what your system does when it sees it.**
 
-I did not build true file upload ingestion. The endpoint accepts a `file_path` value, either in JSON or form data, and reads that path from the server's filesystem; if an external client sends actual multipart file content, the API does not save or parse that uploaded file. The gap is the endpoint design, not a missing dependency.
+Real file uploads. The ingest endpoint only accepts a `file_path` string (JSON or form field) and reads that path off the server's own disk. If a client sends actual multipart file bytes instead, nothing saves or parses them — the endpoint simply isn't built to accept that input shape. This is a deliberate scope choice from early on, not something the app fails at silently.
